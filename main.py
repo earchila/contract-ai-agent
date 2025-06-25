@@ -41,18 +41,19 @@ if page == "Dashboard":
         # Fetch Contract Count by Status
         contract_count_query = "Provide the count of contracts by their status (e.g., Active, Expired, Pending)."
         count_response = await agent_instance.process_query(contract_count_query)
-        if count_response.is_successful and count_response.result and "results" in count_response.result:
+        if hasattr(count_response, 'is_successful') and count_response.is_successful and count_response.result and "results" in count_response.result:
             # Assuming the result is a list of dicts like [{"status": "Active", "count": 150}]
-            contract_counts = {item["status"]: item["count"] for item in count_response.result["results"]}
+            contract_counts = {item.get("status", "Unknown"): item.get("count", 0) for item in count_response.result["results"]}
             kpis["contract_counts"] = contract_counts
         else:
-            st.warning(f"Could not fetch contract counts: {count_response.error if isinstance(count_response.error, str) else 'Unknown error'}")
+            error_message = count_response.error if hasattr(count_response, 'is_successful') else 'Unknown error'
+            st.warning(f"Could not fetch contract counts: {error_message}")
             kpis["contract_counts"] = {"Active": 0, "Expired": 0, "Pending": 0} # Default to 0
 
         # Fetch Average Contract Value
         avg_value_query = "What is the average contract value?"
         avg_value_response = await agent_instance.process_query(avg_value_query)
-        if avg_value_response.is_successful and avg_value_response.result and "results" in avg_value_response.result:
+        if hasattr(avg_value_response, 'is_successful') and avg_value_response.is_successful and avg_value_response.result and "results" in avg_value_response.result:
             # Assuming the result is a list of dicts like [{"average_value": 150000}]
             # Or directly a value if the agent is smart enough to return just the number
             if avg_value_response.result["results"] and "average_value" in avg_value_response.result["results"][0]:
@@ -60,30 +61,33 @@ if page == "Dashboard":
             else:
                 kpis["average_contract_value"] = "$0" # Default
         else:
-            st.warning(f"Could not fetch average contract value: {avg_value_response.error if isinstance(avg_value_response.error, str) else 'Unknown error'}")
+            error_message = avg_value_response.error if hasattr(avg_value_response, 'is_successful') else 'Unknown error'
+            st.warning(f"Could not fetch average contract value: {error_message}")
             kpis["average_contract_value"] = "$0" # Default
 
         # Fetch Upcoming Expirations
         upcoming_exp_query = "List contracts expiring soon, including their Contract_ID and End_Date."
         upcoming_exp_response = await agent_instance.process_query(upcoming_exp_query)
-        if upcoming_exp_response.is_successful and upcoming_exp_response.result and "results" in upcoming_exp_response.result:
+        if hasattr(upcoming_exp_response, 'is_successful') and upcoming_exp_response.is_successful and upcoming_exp_response.result and "results" in upcoming_exp_response.result:
             # Assuming result is list of dicts like [{"Contract_ID": "C001", "End_Date": "2025-07-15"}]
             kpis["upcoming_expirations"] = upcoming_exp_response.result["results"]
         else:
-            st.warning(f"Could not fetch upcoming expirations: {upcoming_exp_response.error if isinstance(upcoming_exp_response.error, str) else 'Unknown error'}")
+            error_message = upcoming_exp_response.error if hasattr(upcoming_exp_response, 'is_successful') else 'Unknown error'
+            st.warning(f"Could not fetch upcoming expirations: {error_message}")
             kpis["upcoming_expirations"] = [] # Default to empty list
 
         # Fetch Total Penalty Amounts
         total_penalties_query = "What is the total sum of all penalty amounts?"
         total_penalties_response = await agent_instance.process_query(total_penalties_query)
-        if total_penalties_response.is_successful and total_penalties_response.result and "results" in total_penalties_response.result:
+        if hasattr(total_penalties_response, 'is_successful') and total_penalties_response.is_successful and total_penalties_response.result and "results" in total_penalties_response.result:
             # Assuming result is list of dicts like [{"total_penalties": 5000}]
             if total_penalties_response.result["results"] and "total_penalties" in total_penalties_response.result["results"][0]:
                 kpis["total_penalty_amounts"] = f"${total_penalties_response.result['results'][0]['total_penalties']:,}"
             else:
                 kpis["total_penalty_amounts"] = "$0" # Default
         else:
-            st.warning(f"Could not fetch total penalty amounts: {total_penalties_response.error if isinstance(total_penalties_response.error, str) else 'Unknown error'}")
+            error_message = total_penalties_response.error if hasattr(total_penalties_response, 'is_successful') else 'Unknown error'
+            st.warning(f"Could not fetch total penalty amounts: {error_message}")
             kpis["total_penalty_amounts"] = "$0" # Default
         
         return kpis
@@ -115,10 +119,11 @@ elif page == "Alerts":
         query_string = "List all active alerts, including their Alert_Type, Contract_ID, and Date."
         response = await agent_instance.process_query(query_string)
 
-        if response.is_successful and response.result and "results" in response.result:
+        if hasattr(response, 'is_successful') and response.is_successful and response.result and "results" in response.result:
             return response.result["results"]
         else:
-            st.warning(f"Could not fetch alerts data: {response.error if isinstance(response.error, str) else 'Unknown error'}")
+            error_message = response.error if hasattr(response, 'is_successful') else 'Unknown error'
+            st.warning(f"Could not fetch alerts data: {error_message}")
             return []
 
     alerts_data = asyncio.run(get_alerts_data_from_agent(agent))
@@ -137,7 +142,7 @@ elif page == "Contracts":
         query_string = "List all contracts with their Contract_ID, Contract_Type, Provider, Company, Business_Unit, and Price."
         response = await agent_instance.process_query(query_string)
         
-        if response.is_successful and response.result and "results" in response.result:
+        if hasattr(response, 'is_successful') and response.is_successful and response.result and "results" in response.result:
             # Convert list of dictionaries to dictionary of lists for st.dataframe
             data_list_of_dicts = response.result["results"]
             if not data_list_of_dicts:
@@ -148,7 +153,8 @@ elif page == "Contracts":
             contracts_data = {key: [d[key] for d in data_list_of_dicts] for key in keys}
             return contracts_data
         else:
-            st.error(f"Failed to fetch contracts data: {response.error if isinstance(response.error, str) else 'Unknown error'}")
+            error_message = response.error if hasattr(response, 'is_successful') else 'Unknown error'
+            st.error(f"Failed to fetch contracts data: {error_message}")
             return {} # Return empty dictionary on failure
 
     # Fetch data for the contracts section
@@ -188,12 +194,13 @@ elif page == "Contracts":
             query_string = f"Provide all details for Contract_ID '{contract_id}'."
             response = await agent_instance.process_query(query_string)
             
-            if response.is_successful and response.result and "results" in response.result:
+            if hasattr(response, 'is_successful') and response.is_successful and response.result and "results" in response.result:
                 # Assuming the result is a list of dictionaries, and we want the first one
                 if response.result["results"]:
                     return response.result["results"][0]
             else:
-                st.error(f"Failed to fetch details for Contract ID {contract_id}: {response.error if isinstance(response.error, str) else 'Unknown error'}")
+                error_message = response.error if hasattr(response, 'is_successful') else 'Unknown error'
+                st.error(f"Failed to fetch details for Contract ID {contract_id}: {error_message}")
             return {}
 
         contract_details = asyncio.run(get_contract_details_from_agent(agent, selected_contract_id))
@@ -213,14 +220,14 @@ elif page == "Agent Interaction":
             try:
                 # Run the async process_query in a synchronous Streamlit context
                 response = asyncio.run(agent.process_query(user_query))
-                print(f"DEBUG: type(response): {type(response)}")
-                print(f"DEBUG: response.is_successful: {response.is_successful}")
-                if response.is_successful:
-                    st.success(f"Agent Response: {response.result}")
+                if hasattr(response, 'is_successful'):
+                    if response.is_successful:
+                        st.success(f"Agent Response: {response.result}")
+                    else:
+                        st.error(f"Agent Error: {response.error if isinstance(response.error, str) else 'Unknown error'}")
                 else:
-                    print(f"DEBUG: type(response.error): {type(response.error)}")
-                    print(f"DEBUG: repr(response.error): {repr(response.error)}")
-                    st.error(f"Agent Error: {response.error if isinstance(response.error, str) else 'Unknown error'}")
+                    # Handle direct string responses
+                    st.success(f"Agent Response: {response}")
             except Exception as e:
                 st.error(f"An unexpected error occurred: {e}")
         else:

@@ -38,7 +38,7 @@ def create_bigquery_schema(project_id, dataset_id):
         bigquery.SchemaField("penalty_id", "STRING", mode="REQUIRED"),
         bigquery.SchemaField("contract_id", "STRING"),
         bigquery.SchemaField("penalty_description", "STRING"),
-        bigquery.SchemaField("penalty_amount_formula", "STRING"),
+        bigquery.SchemaField("penalty_amount", "NUMERIC"),
         bigquery.SchemaField("trigger_condition", "STRING"),
     ]
 

@@ -92,7 +92,24 @@ Based on the following schema, please generate a SQL query to answer the user's 
 Schema for `contracts` table:
 {schema}
 
+When a query requires the status of a contract, you should derive it based on the `start_date` and `end_date` columns using a `CASE` statement. The status can be one of 'Active', 'Expired', or 'Pending'.
+- A contract is 'Active' if the current date is between the `start_date` and `end_date`.
+- A contract is 'Expired' if the current date is after the `end_date`.
+- A contract is 'Pending' if the current date is before the `start_date`.
+
+Use the following SQL syntax to determine the status:
+```sql
+CASE
+  WHEN CURRENT_DATE() BETWEEN start_date AND end_date THEN 'Active'
+  WHEN CURRENT_DATE() > end_date THEN 'Expired'
+  ELSE 'Pending'
+END AS status
+```
+
 User Request: {query}
+
+When asked for upcoming expirations, you should consider contracts expiring in the next 90 days.
+When asked for the total penalty amount, you should sum the `penalty_amount` column.
 """
     response = chat_session.send_message(prompt, tools=vertexai_tools)
 
@@ -121,7 +138,7 @@ User Request: {query}
                     return ToolResult.from_error(f"Tool '{tool_name}' not found.")
                 elif part.text:
                     # If the model returns text, it's a direct answer
-                    return ToolResult.success({"response": part.text})
+                    return part.text
     return ToolResult.from_error(error="No valid response from agent.")
 
   async def close(self):

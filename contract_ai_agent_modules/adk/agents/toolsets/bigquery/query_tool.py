@@ -72,8 +72,13 @@ async def execute_sql(
       import re
       # Add the dataset prefix to all tables in the query
       query = re.sub(
-          r"(FROM|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*)",
-          rf"\1 {bigquery_tool_config.default_dataset_id}.\2",
+          r"FROM\s+`?([a-zA-Z_][a-zA-Z0-9_]*)`?",
+          rf"FROM `{bigquery_tool_config.default_dataset_id}.\g<1>`",
+          query,
+      )
+      query = re.sub(
+          r"JOIN\s+`?([a-zA-Z_][a-zA-Z0-9_]*)`?",
+          rf"JOIN `{bigquery_tool_config.default_dataset_id}.\g<1>`",
           query,
       )
   try:
