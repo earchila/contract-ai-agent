@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Contract Management Web Application Plan
 
 This document outlines the plan for developing a web application to manage contracts, featuring a comprehensive frontend, a Python-based backend leveraging Google's Gemini agents, and BigQuery for data storage.
@@ -156,3 +157,7 @@ graph TD
     *   Develop the Dashboard, Alerts, and Contracts sections, connecting them to the backend APIs.
     *   Implement the Agent Interaction chat interface.
 5.  **Deployment**: Deploy the Streamlit app and Python backend agents (e.g., on Google Cloud Run, App Engine, or Vertex AI Endpoints).
+=======
+# contract-ai-agent
+Contract AI Dashboard &amp; Agent
+>>>>>>> d6328acf47c9de066b24337e3a9dcf2f67168317
