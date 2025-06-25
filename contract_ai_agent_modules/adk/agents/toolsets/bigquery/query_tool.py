@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import functools
 from typing import Any, Callable, Dict, List, Optional
+import logging
 
 from google.cloud import bigquery
 
@@ -82,6 +83,7 @@ async def execute_sql(
           query,
       )
   try:
+    logging.info("Executing query: %s", query)
     query_job = client.query(query)
     rows = query_job.result()
 
@@ -93,7 +95,8 @@ async def execute_sql(
       if max_rows and i >= max_rows:
         break
       results.append(dict(row))
-
+    logging.info("Query results: %s", results)
     return ToolResult.success({"results": results})
   except Exception as e:
+    logging.error("Error executing SQL query: %s", e, exc_info=True)
     return ToolResult.from_error(f"Error executing SQL query: {e}")

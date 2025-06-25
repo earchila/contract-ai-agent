@@ -109,7 +109,8 @@ END AS status
 User Request: {query}
 
 When asked for upcoming expirations, you should consider contracts expiring in the next 90 days.
-When asked for the total penalty amount, you should sum the `penalty_amount` column.
+When asked for the total penalty amount, you should sum the `penalty_amount` column and return it as `total_penalties`.
+When asked for the average contract value, you should calculate the average of the `price` column and return it as `average_value`.
 """
     response = chat_session.send_message(prompt, tools=vertexai_tools)
 
@@ -122,7 +123,7 @@ When asked for the total penalty amount, you should sum the `penalty_amount` col
                     # Execute the tool call
                     tool_call = part.function_call
                     tool_name = tool_call.name
-                    tool_args = {k: v for k, v in tool_call.args.items()} # Convert to dict
+                    tool_args = {k: v for k, v in tool_call.args.items()}
 
                     # Find the tool and execute it
                     for tool in all_tools:
@@ -137,8 +138,29 @@ When asked for the total penalty amount, you should sum the `penalty_amount` col
                                 return ToolResult.from_error(f"Error executing tool '{tool_name}': {e}")
                     return ToolResult.from_error(f"Tool '{tool_name}' not found.")
                 elif part.text:
-                    # If the model returns text, it's a direct answer
-                    return part.text
+                    # If the model returns text, check if it's a valid SQL query
+                    sql_query = part.text.strip()
+                    # A simple check to see if the response is likely a SQL query
+                    if sql_query.upper().startswith('SELECT') or '```sql' in sql_query:
+                        # Extract SQL from markdown code block if present
+                        if '```sql' in sql_query:
+                            sql_query = sql_query.split('```sql')[1].split('```')[0].strip()
+                        
+                        # Find the execute_sql tool and execute it
+                        for tool in all_tools:
+                            if tool.name == "execute_sql":
+                                try:
+                                    tool_result = await tool._call(readonly_context, query=sql_query)
+                                    if tool_result.is_successful:
+                                        return tool_result
+                                    else:
+                                        return ToolResult.from_error(f"SQL execution failed: {tool_result.error}")
+                                except Exception as e:
+                                    return ToolResult.from_error(f"Error executing SQL query: {e}")
+                        return ToolResult.from_error("SQL execution tool not found.")
+                    else:
+                        # The model returned text that is not a SQL query.
+                        return ToolResult.from_error(f"The agent returned a non-SQL response: {sql_query}")
     return ToolResult.from_error(error="No valid response from agent.")
 
   async def close(self):
