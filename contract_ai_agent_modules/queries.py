@@ -15,24 +15,11 @@
 """This file contains all the pre-defined queries for the application."""
 
 # Dashboard Queries
-CONTRACT_COUNT_QUERY = """
-SELECT
-  CASE
-    WHEN CURRENT_DATE() BETWEEN start_date AND end_date THEN 'Active'
-    WHEN CURRENT_DATE() > end_date THEN 'Expired'
-    ELSE 'Pending'
-  END AS status,
-  COUNT(contract_id) AS contract_count
-FROM `contract_data.contracts`
-GROUP BY
-  status
-"""
-
-AVERAGE_CONTRACT_VALUE_QUERY = "SELECT AVG(price) as average_value FROM `contract_data.contracts`"
-
-UPCOMING_EXPIRATIONS_QUERY = "SELECT contract_id, end_date FROM `contract_data.contracts` WHERE end_date BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL 90 DAY)"
+CONTRACT_COUNT_QUERY = "SELECT COUNT(contract_id) AS contract_count FROM `contract_data.contracts`"
 
 TOTAL_PENALTY_AMOUNTS_QUERY = "SELECT SUM(penalty_amount) as total_penalties FROM `contract_data.penalties`"
+
+RECENT_CONTRACTS_QUERY = "SELECT contract_id, contract_name, contract_type, business_unit, provider FROM `contract_data.contracts` ORDER BY start_date DESC LIMIT 10"
 
 # Alerts Queries
 ALERTS_QUERY = "SELECT * FROM `contract_data.alerts`"

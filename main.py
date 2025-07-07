@@ -3,6 +3,7 @@ import asyncio
 import sys
 import os
 import logging
+import json
 
 from contract_ai_agent_modules.adk.agents.main_agent.main_agent import ContractAgent
 from contract_ai_agent_modules.adk.agents.toolsets.bigquery.bigquery_credentials import BigQueryCredentialsConfig
@@ -17,7 +18,44 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 st.set_page_config(layout="wide")
 
-st.title("Contract Management Application")
+# Custom CSS for styling
+st.markdown("""
+    <style>
+    .main-header {
+        font-size: 24px;
+        font-weight: bold;
+    }
+    .sub-header {
+        font-size: 16px;
+        color: grey;
+    }
+    .kpi-card {
+        background-color: #f9f9f9;
+        border: 1px solid #e6e6e6;
+        border-radius: 5px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .kpi-card h3 {
+        margin-bottom: 10px;
+        font-size: 16px;
+        color: #333;
+    }
+    .kpi-card p {
+        font-size: 36px;
+        font-weight: bold;
+        color: #000;
+    }
+    .recent-contracts {
+        margin-top: 30px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Header
+st.markdown('<p class="main-header">LegalMind</p><p class="sub-header">Contract Analyzer</p>', unsafe_allow_html=True)
+
 
 # Initialize the ContractAgent and BigQueryClient
 bigquery_project_id = os.environ.get("BIGQUERY_PROJECT_ID", "walmart-chile-458918")
@@ -38,53 +76,92 @@ agent = ContractAgent(
 )
 
 # Sidebar for navigation
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Dashboard", "Alerts", "Contracts", "Agent Interaction"])
+st.sidebar.image("https://storage.googleapis.com/cloud-native-news/2022/03/cymbals-logo-1-1024x576.png", width=150)
+page = st.sidebar.radio("Go to", ["Dashboard", "Contracts", "Add Contract", "Alerts", "Agent Interaction"])
+
+@st.dialog("Contract Details")
+def display_contract_details(contract_id):
+    contract_details_df = bigquery_client.query_to_dataframe(queries.get_contract_details_query(contract_id))
+    if not contract_details_df.empty:
+        details = contract_details_df.to_dict(orient='records')[0]
+        for key, value in details.items():
+            if key == "ocr_text_ref":
+                if value:
+                    # Assuming the GCS URI is in the format gs://bucket_name/file_path
+                    gcs_uri = value
+                    bucket_name = gcs_uri.split('/')[2]
+                    file_path = '/'.join(gcs_uri.split('/')[3:])
+                    url = f"https://storage.googleapis.com/{bucket_name}/{file_path}"
+                    st.markdown(f"**{key.replace('_', ' ').title()}:** [View PDF]({url})")
+                else:
+                    st.markdown(f"**{key.replace('_', ' ').title()}:** Not available")
+            elif key == "financials":
+                st.markdown(f"**{key.replace('_', ' ').title()}:**")
+                try:
+                    financial_data = json.loads(value)
+                    for fin_key, fin_value in financial_data.items():
+                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;**{fin_key.replace('_', ' ').title()}:** {fin_value}")
+                except (json.JSONDecodeError, TypeError):
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{value}")
+            else:
+                st.markdown(f"**{key.replace('_', ' ').title()}:** {value}")
+    else:
+        st.info(f"No detailed information found for Contract ID: {contract_id}")
 
 if page == "Dashboard":
-    st.header("Dashboard - Key Performance Indicators")
-    st.write("This section will display various KPIs related to contracts.")
+    st.header("Dashboard")
+    st.write("Welcome to LegalMind. Get an overview of your contract landscape.")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("Add New Contract"):
+            st.session_state.page = "Add Contract"
 
     # Fetch and display KPIs
+    total_contracts = 0
     contract_counts_df = bigquery_client.query_to_dataframe(queries.CONTRACT_COUNT_QUERY)
     if not contract_counts_df.empty:
-        contract_counts = {row['status']: row['contract_count'] for index, row in contract_counts_df.iterrows()}
-        st.subheader("Contract Count by Status")
-        st.bar_chart(contract_counts)
-    else:
-        st.warning("Could not fetch contract counts.")
+        total_contracts = contract_counts_df['contract_count'].sum()
 
-    avg_value_df = bigquery_client.query_to_dataframe(queries.AVERAGE_CONTRACT_VALUE_QUERY)
-    if not avg_value_df.empty:
-        avg_value = avg_value_df['average_value'][0]
-        st.subheader("Average Contract Value")
-        st.metric(label="Average Value", value=f"${avg_value:,.2f}")
-    else:
-        st.warning("Could not fetch average contract value.")
-
-    upcoming_expirations_df = bigquery_client.query_to_dataframe(queries.UPCOMING_EXPIRATIONS_QUERY)
-    st.subheader("Upcoming Expirations")
-    if not upcoming_expirations_df.empty:
-        st.table(upcoming_expirations_df)
-    else:
-        st.info("No upcoming expirations found.")
-
-    total_penalties_df = bigquery_client.query_to_dataframe(queries.TOTAL_PENALTY_AMOUNTS_QUERY)
-    if not total_penalties_df.empty:
-        total_penalties = total_penalties_df['total_penalties'][0]
-        st.subheader("Total Penalty Amounts")
-        st.metric(label="Total Penalties", value=f"${total_penalties:,.2f}")
-    else:
-        st.warning("Could not fetch total penalty amounts.")
-
-elif page == "Alerts":
-    st.header("Alerts")
-    st.write("This section will display alerts for contract expirations, warranties, etc.")
+    active_alerts = 0
     alerts_df = bigquery_client.query_to_dataframe(queries.ALERTS_QUERY)
     if not alerts_df.empty:
-        st.table(alerts_df)
+        active_alerts = len(alerts_df)
+
+    potential_penalties = 0
+    total_penalties_df = bigquery_client.query_to_dataframe(queries.TOTAL_PENALTY_AMOUNTS_QUERY)
+    if not total_penalties_df.empty:
+        potential_penalties = total_penalties_df['total_penalties'][0]
+
+    kpi1, kpi2, kpi3 = st.columns(3)
+    with kpi1:
+        st.markdown('<div class="kpi-card"><h3>Total Contracts</h3><p>{}</p></div>'.format(total_contracts), unsafe_allow_html=True)
+    with kpi2:
+        st.markdown('<div class="kpi-card"><h3>Active Alerts</h3><p>{}</p></div>'.format(active_alerts), unsafe_allow_html=True)
+    with kpi3:
+        st.markdown('<div class="kpi-card"><h3>Potential Penalties</h3><p>${:,.2f}</p></div>'.format(potential_penalties), unsafe_allow_html=True)
+
+    st.markdown('<div class="recent-contracts"><h3>Recent Contracts</h3></div>', unsafe_allow_html=True)
+    
+    recent_contracts_df = bigquery_client.query_to_dataframe(queries.RECENT_CONTRACTS_QUERY)
+    if not recent_contracts_df.empty:
+        for index, row in recent_contracts_df.iterrows():
+            col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 2])
+            with col1:
+                st.write(row['contract_id'])
+            with col2:
+                st.write(row.get('contract_name', 'N/A'))
+            with col3:
+                st.write(row['contract_type'])
+            with col4:
+                st.write(row['business_unit'])
+            with col5:
+                st.write(row['provider'])
+            with col6:
+                if st.button("View", key=f"view_{index}_{row['contract_id']}"):
+                    display_contract_details(row['contract_id'])
     else:
-        st.info("No new alerts at the moment.")
+        st.info("No contracts uploaded yet.")
 
 elif page == "Contracts":
     st.header("Contracts")
@@ -122,6 +199,20 @@ elif page == "Contracts":
             st.json(contract_details_df.to_dict(orient='records')[0])
         else:
             st.info(f"No detailed information found for Contract ID: {selected_contract_id}")
+
+elif page == "Add Contract":
+    st.header("Add New Contract")
+    st.write("This section will allow you to add a new contract.")
+    # Add form elements here
+
+elif page == "Alerts":
+    st.header("Alerts")
+    st.write("This section will display alerts for contract expirations, warranties, etc.")
+    alerts_df = bigquery_client.query_to_dataframe(queries.ALERTS_QUERY)
+    if not alerts_df.empty:
+        st.table(alerts_df)
+    else:
+        st.info("No new alerts at the moment.")
 
 elif page == "Agent Interaction":
     st.header("Agent Interaction - Talk with Contracts")
