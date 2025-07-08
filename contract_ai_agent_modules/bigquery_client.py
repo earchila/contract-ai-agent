@@ -40,4 +40,4 @@ class BigQueryClient:
         table_ref = self.client.dataset(self.dataset_id).table(table_id)
         errors = self.client.insert_rows_json(table_ref, [row])
         if errors:
-            print(f"Errors inserting row: {errors}")
+            raise Exception(f"Errors inserting row: {errors}")

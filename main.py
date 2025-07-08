@@ -10,7 +10,6 @@ import tempfile
 from contract_ai_agent_modules.adk.agents.main_agent.main_agent import ContractAgent
 from contract_ai_agent_modules.adk.agents.toolsets.bigquery.bigquery_credentials import BigQueryCredentialsConfig
 from contract_ai_agent_modules.adk.agents.toolsets.bigquery.config import BigQueryToolConfig
-from create_bigquery_schema import create_bigquery_schema
 from contract_ai_agent_modules.bigquery_client import BigQueryClient
 import contract_ai_agent_modules.queries as queries
 import pandas as pd
@@ -64,9 +63,6 @@ bigquery_project_id = os.environ.get("BIGQUERY_PROJECT_ID", "walmart-chile-45891
 bigquery_location = os.environ.get("BIGQUERY_LOCATION", "us-central1")
 bigquery_dataset_id = "contract_data"
 bigquery_max_rows = int(os.environ.get("BIGQUERY_MAX_ROWS", 100))
-
-# Create the BigQuery schema
-create_bigquery_schema(bigquery_project_id, bigquery_dataset_id)
 
 bigquery_client = BigQueryClient(project_id=bigquery_project_id, dataset_id=bigquery_dataset_id)
 
