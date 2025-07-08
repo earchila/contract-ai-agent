@@ -4,6 +4,8 @@ import sys
 import os
 import logging
 import json
+from google.cloud import storage
+import tempfile
 
 from contract_ai_agent_modules.adk.agents.main_agent.main_agent import ContractAgent
 from contract_ai_agent_modules.adk.agents.toolsets.bigquery.bigquery_credentials import BigQueryCredentialsConfig
@@ -108,6 +110,17 @@ def display_contract_details(contract_id):
     else:
         st.info(f"No detailed information found for Contract ID: {contract_id}")
 
+def upload_to_gcs(uploaded_file):
+    """Uploads a file to a GCS bucket."""
+    bucket_name = "contract_pdfs"
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(uploaded_file.name)
+
+    blob.upload_from_file(uploaded_file)
+
+    return f"gs://{bucket_name}/{uploaded_file.name}"
+
 if page == "Dashboard":
     st.header("Dashboard")
     st.write("Welcome to LegalMind. Get an overview of your contract landscape.")
@@ -202,8 +215,44 @@ elif page == "Contracts":
 
 elif page == "Add Contract":
     st.header("Add New Contract")
-    st.write("This section will allow you to add a new contract.")
-    # Add form elements here
+    
+    uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
+    
+    if uploaded_file is not None:
+        if st.button("Process Contract"):
+            with st.spinner("Processing contract..."):
+                try:
+                    # 1. Upload to GCS
+                    gcs_uri = upload_to_gcs(uploaded_file)
+                    st.success(f"File uploaded to {gcs_uri}")
+
+                    # 2. Save to a temporary local file
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                        temp_file.write(uploaded_file.getvalue())
+                        temp_file_path = temp_file.name
+
+                    # 3. Process with MCP
+                    st.info("Extracting data from the contract...")
+                    result = asyncio.run(agent.add_new_contract(temp_file_path))
+                    if result.is_successful:
+                        extracted_data = result.result
+                        # Add the GCS URI to the extracted data
+                        extracted_data['ocr_text_ref'] = gcs_uri
+                        
+                        # Insert into BigQuery
+                        st.info("Saving data to BigQuery...")
+                        bigquery_client.insert_row("contracts", extracted_data)
+                        st.success("Contract processed and saved successfully!")
+                        st.json(extracted_data)
+                    else:
+                        st.error(f"Failed to process contract: {result.error}")
+
+                except Exception as e:
+                    st.error(f"An error occurred: {e}")
+                finally:
+                    # Clean up the temporary file
+                    if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+                        os.remove(temp_file_path)
 
 elif page == "Alerts":
     st.header("Alerts")

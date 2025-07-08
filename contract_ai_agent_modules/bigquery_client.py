@@ -34,3 +34,10 @@ class BigQueryClient:
         except Exception as e:
             print(f"Error executing query: {e}")
             return pd.DataFrame()
+
+    def insert_row(self, table_id: str, row: dict):
+        """Inserts a row into the specified table."""
+        table_ref = self.client.dataset(self.dataset_id).table(table_id)
+        errors = self.client.insert_rows_json(table_ref, [row])
+        if errors:
+            print(f"Errors inserting row: {errors}")

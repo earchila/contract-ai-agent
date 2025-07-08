@@ -31,6 +31,7 @@ from contract_ai_agent_modules.adk.agents.toolsets.bigquery.bigquery_toolset imp
 from contract_ai_agent_modules.adk.agents.toolsets.bigquery.config import BigQueryToolConfig
 from contract_ai_agent_modules.adk.agents.toolsets.bigquery.bigquery_credentials import BigQueryCredentialsConfig
 from contract_ai_agent_modules.adk.agents.toolsets.general_insights.general_insights_toolset import GeneralInsightsToolset
+from contract_ai_agent_modules.adk.agents.toolsets.document_processing.document_processing_toolset import DocumentProcessingToolset
 
 
 @experimental
@@ -49,6 +50,7 @@ class ContractAgent:
         tool_name="execute_sql",
     )
     self._general_insights_toolset = GeneralInsightsToolset()
+    self._document_processing_toolset = DocumentProcessingToolset()
 
     # Initialize Vertex AI
     vertexai.init(project=os.environ.get("GOOGLE_CLOUD_PROJECT"), location=os.environ.get("GOOGLE_CLOUD_LOCATION"))
@@ -163,7 +165,23 @@ When asked for the average contract value, you should calculate the average of t
                         return ToolResult.from_error(f"The agent returned a non-SQL response: {sql_query}")
     return ToolResult.from_error(error="No valid response from agent.")
 
+  async def add_new_contract(self, file_path: str) -> ToolResult:
+      """Adds a new contract by processing a file.
+
+      Args:
+          file_path: The absolute path to the contract PDF file.
+
+      Returns:
+          A ToolResult indicating the success or failure of the operation.
+      """
+      readonly_context = ReadonlyContext()
+      tools = await self._document_processing_toolset.get_tools(readonly_context)
+      process_document_tool = tools[0]
+
+      return await process_document_tool._call(readonly_context, file_path=file_path)
+
   async def close(self):
     """Closes the agent and its underlying toolsets."""
     await self._bigquery_toolset.close()
     await self._general_insights_toolset.close()
+    await self._document_processing_toolset.close()
