@@ -77,6 +77,25 @@ agent = ContractAgent(
 st.sidebar.image("https://storage.googleapis.com/cloud-native-news/2022/03/cymbals-logo-1-1024x576.png", width=150)
 page = st.sidebar.radio("Go to", ["Contracts", "Analyze new Contract", "Agent Interaction"])
 
+def format_agent_response(result):
+    """Formats the agent's response for display in the Streamlit UI."""
+    if isinstance(result, dict):
+        if 'results' in result and isinstance(result['results'], list):
+            # Format SQL query results from the agent
+            return pd.DataFrame(result['results']).to_markdown(index=False)
+        elif 'response' in result and isinstance(result['response'], str):
+            # The agent returns Markdown, so we pass it directly to the UI.
+            return result['response']
+    elif isinstance(result, list) and all(isinstance(item, dict) for item in result):
+        # Direct list of dicts (e.g., from a direct tool call)
+        return pd.DataFrame(result).to_markdown(index=False)
+    elif isinstance(result, str):
+        # The agent returns Markdown, so we pass it directly to the UI.
+        return result
+    
+    # Fallback for any other data types
+    return str(result)
+
 def display_contract_details(contract_id):
     st.subheader(f"Contract Details: {contract_id}")
     contract_details_df = bigquery_client.query_to_dataframe(queries.get_contract_details_query(contract_id))
@@ -245,12 +264,14 @@ elif page == "Agent Interaction":
                 response = asyncio.run(agent.process_query(user_query))
                 if hasattr(response, 'is_successful'):
                     if response.is_successful:
-                        st.success(f"Agent Response: {response.result}")
+                        formatted_response = format_agent_response(response.result)
+                        st.markdown(formatted_response, unsafe_allow_html=True)
                     else:
                         st.error(f"Agent Error: {response.error if isinstance(response.error, str) else 'Unknown error'}")
                 else:
                     # Handle direct string responses
-                    st.success(f"Agent Response: {response}")
+                    formatted_response = format_agent_response(response)
+                    st.markdown(formatted_response, unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"An unexpected error occurred: {e}")
         else:

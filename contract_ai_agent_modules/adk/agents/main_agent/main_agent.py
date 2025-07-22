@@ -88,31 +88,27 @@ class ContractAgent:
 
     # Send the query to the model
     chat_session = self._model.start_chat()
-    prompt = f"""You are a BigQuery expert. You have access to a table named `contracts`.
-Based on the following schema, please generate a SQL query to answer the user's request.
+    prompt = f"""You are a BigQuery expert and a helpful assistant. Your primary goal is to provide accurate answers about contracts.
 
-Schema for `contracts` table:
+**Instructions:**
+1.  **If the user asks for data (e.g., "list all contracts"), generate a SQL query.**
+2.  **If the user asks a general question (e.g., "what can you do?" or "explain the schema"), provide a clear, user-friendly response formatted in Markdown.**
+3.  **When explaining the database schema, use a Markdown list to describe each field and its data type.**
+
+**Schema for `contracts` table:**
 {schema}
 
-When a query requires the status of a contract, you should derive it based on the `start_date` and `end_date` columns using a `CASE` statement. The status can be one of 'Active', 'Expired', or 'Pending'.
-- A contract is 'Active' if the current date is between the `start_date` and `end_date`.
-- A contract is 'Expired' if the current date is after the `end_date`.
-- A contract is 'Pending' if the current date is before the `start_date`.
+**SQL Generation Rules:**
+- When a query requires the status of a contract, derive it using a `CASE` statement with the following logic:
+  - **Active**: `CURRENT_DATE() BETWEEN start_date AND end_date`
+  - **Expired**: `CURRENT_DATE() > end_date`
+  - **Pending**: `CURRENT_DATE() < start_date`
+- For upcoming expirations, consider contracts expiring in the next 90 days.
+- For total penalty amount, sum the `penalty_amount` column.
+- For average contract value, calculate the average of the `price` column.
 
-Use the following SQL syntax to determine the status:
-```sql
-CASE
-  WHEN CURRENT_DATE() BETWEEN start_date AND end_date THEN 'Active'
-  WHEN CURRENT_DATE() > end_date THEN 'Expired'
-  ELSE 'Pending'
-END AS status
-```
-
-User Request: {query}
-
-When asked for upcoming expirations, you should consider contracts expiring in the next 90 days.
-When asked for the total penalty amount, you should sum the `penalty_amount` column and return it as `total_penalties`.
-When asked for the average contract value, you should calculate the average of the `price` column and return it as `average_value`.
+**User Request:**
+{query}
 """
     response = chat_session.send_message(prompt, tools=vertexai_tools)
 
@@ -161,8 +157,8 @@ When asked for the average contract value, you should calculate the average of t
                                     return ToolResult.from_error(f"Error executing SQL query: {e}")
                         return ToolResult.from_error("SQL execution tool not found.")
                     else:
-                        # The model returned text that is not a SQL query.
-                        return ToolResult.from_error(f"The agent returned a non-SQL response: {sql_query}")
+                        # The model returned text that is not a SQL query, so we treat it as a successful natural language response.
+                        return ToolResult(result={"response": sql_query})
     return ToolResult.from_error(error="No valid response from agent.")
 
   async def add_new_contract(self, file_path: str) -> ToolResult:
