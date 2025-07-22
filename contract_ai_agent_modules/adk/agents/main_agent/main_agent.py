@@ -92,8 +92,25 @@ class ContractAgent:
 
 **Instructions:**
 1.  **If the user asks for data (e.g., "list all contracts"), generate a SQL query.**
-2.  **If the user asks a general question (e.g., "what can you do?" or "explain the schema"), provide a clear, user-friendly response formatted in Markdown.**
-3.  **When explaining the database schema, use a Markdown list to describe each field and its data type.**
+2.  **If the user asks to "explain the schema", you MUST return a JSON object with a single key, "schema_explanation", containing a list of objects. Each object must have "name", "type", and "description" keys.**
+    **Example JSON Output:**
+    ```json
+    {{
+      "schema_explanation": [
+        {{
+          "name": "contract_id",
+          "type": "STRING",
+          "description": "Unique identifier for the contract."
+        }},
+        {{
+          "name": "contract_name",
+          "type": "STRING",
+          "description": "Name of the contract."
+        }}
+      ]
+    }}
+    ```
+3.  **For any other general question (e.g., "what can you do?"), provide a clear, user-friendly response in standard text.**
 
 **Schema for `contracts` table:**
 {schema}

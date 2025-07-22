@@ -81,17 +81,25 @@ def format_agent_response(result):
     """Formats the agent's response for display in the Streamlit UI."""
     if isinstance(result, dict):
         if 'results' in result and isinstance(result['results'], list):
-            # Format SQL query results from the agent
+            # Format SQL query results into a Markdown table
             return pd.DataFrame(result['results']).to_markdown(index=False)
-        elif 'response' in result and isinstance(result['response'], str):
-            # The agent returns Markdown, so we pass it directly to the UI.
-            return result['response']
-    elif isinstance(result, list) and all(isinstance(item, dict) for item in result):
-        # Direct list of dicts (e.g., from a direct tool call)
+        
+        if 'response' in result:
+            try:
+                # Check if the response is a JSON string for schema explanation
+                data = json.loads(result['response'])
+                if 'schema_explanation' in data and isinstance(data['schema_explanation'], list):
+                    markdown_output = "### Database Schema\n"
+                    for field in data['schema_explanation']:
+                        markdown_output += f"- **`{field.get('name', 'N/A')}`** (`{field.get('type', 'N/A')}`): {field.get('description', 'N/A')}\n"
+                    return markdown_output
+            except (json.JSONDecodeError, TypeError):
+                # If it's not a valid JSON or not the expected structure, treat as plain text
+                return str(result['response'])
+
+    if isinstance(result, list) and all(isinstance(item, dict) for item in result):
+        # Handles cases where the result is a direct list of records
         return pd.DataFrame(result).to_markdown(index=False)
-    elif isinstance(result, str):
-        # The agent returns Markdown, so we pass it directly to the UI.
-        return result
     
     # Fallback for any other data types
     return str(result)
