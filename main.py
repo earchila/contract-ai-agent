@@ -5,7 +5,11 @@ import os
 import logging
 import json
 from google.cloud import storage
+import importlib.resources as pkg_resources
+import io
 import tempfile
+from cairosvg import svg2png
+from PIL import Image
 
 from contract_ai_agent_modules.adk.agents.main_agent.main_agent import ContractAgent
 from contract_ai_agent_modules.adk.agents.toolsets.bigquery.bigquery_credentials import BigQueryCredentialsConfig
@@ -18,6 +22,101 @@ import pandas as pd
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 st.set_page_config(layout="wide")
+
+# Translations dictionary
+translations = {
+    "en": {
+        "main_header": "LegalMind",
+        "sub_header": "Contract Analyzer",
+        "sidebar_image_not_found": "Sidebar image not found. Please ensure 'Walmart_Chile_Logo.svg' is in 'contract_ai_agent_modules/static/images/'.",
+        "error_loading_sidebar_image": "Error loading sidebar image:",
+        "go_to": "Go to",
+        "language": "Language",
+        "contracts": "Contracts",
+        "analyze_new_contract": "Analyze new Contract",
+        "agent_interaction": "Agent Interaction",
+        "contract_details": "Contract Details:",
+        "not_available": "Not available",
+        "no_detailed_info": "No detailed information found for Contract ID:",
+        "extracted_contract_data": "Extracted Contract Data",
+        "this_section_lists_contracts": "This section lists all contracts. Use the filters to narrow down the results and click on a contract to view its details.",
+        "no_contract_data_available": "No contract data available or failed to fetch data.",
+        "search_by_attribute": "Search by any attribute",
+        "filter_by_company": "Filter by Company",
+        "all": "All",
+        "filter_by_business_unit": "Filter by Business Unit",
+        "select_row_to_view_details": "Select a row to view contract details.",
+        "choose_pdf_file": "Choose a PDF file",
+        "process_contract": "Process Contract",
+        "processing_contract": "Processing contract...",
+        "file_uploaded_to": "File uploaded to",
+        "extracting_data": "Extracting data from the contract...",
+        "saving_data_to_bigquery": "Saving data to BigQuery...",
+        "contract_processed_successfully": "Contract processed and saved successfully!",
+        "failed_to_process_contract": "Failed to process contract:",
+        "an_error_occurred": "An error occurred:",
+        "agent_interaction_header": "Agent Interaction - Talk with Contracts",
+        "agent_interaction_description": "This section allows you to interact with the Gemini agent to ask questions about contracts.",
+        "ask_question_about_contracts": "Ask a question about contracts:",
+        "ask_agent": "Ask Agent",
+        "you_asked": "You asked:",
+        "agent_error": "Agent Error:",
+        "unknown_error": "Unknown error",
+        "unexpected_error_occurred": "An unexpected error occurred:",
+        "please_enter_question": "Please enter a question.",
+        "view_pdf": "View PDF",
+        "database_schema": "Database Schema",
+    },
+    "es": {
+        "main_header": "LegalMind",
+        "sub_header": "Analizador de Contratos",
+        "sidebar_image_not_found": "Imagen de la barra lateral no encontrada. Asegúrese de que 'Walmart_Chile_Logo.svg' esté en 'contract_ai_agent_modules/static/images/'.",
+        "error_loading_sidebar_image": "Error al cargar la imagen de la barra lateral:",
+        "go_to": "Ir a",
+        "language": "Idioma",
+        "contracts": "Contratos",
+        "analyze_new_contract": "Analizar nuevo Contrato",
+        "agent_interaction": "Interacción del Agente",
+        "contract_details": "Detalles del Contrato:",
+        "not_available": "No disponible",
+        "no_detailed_info": "No se encontró información detallada para el ID de Contrato:",
+        "extracted_contract_data": "Datos del Contrato Extraídos",
+        "this_section_lists_contracts": "Esta sección lista todos los contratos. Use los filtros para reducir los resultados y haga clic en un contrato para ver sus detalles.",
+        "no_contract_data_available": "No hay datos de contrato disponibles o falló la obtención de datos.",
+        "search_by_attribute": "Buscar por cualquier atributo",
+        "filter_by_company": "Filtrar por Empresa",
+        "all": "Todos",
+        "filter_by_business_unit": "Filtrar por Unidad de Negocio",
+        "select_row_to_view_details": "Seleccione una fila para ver los detalles del contrato.",
+        "choose_pdf_file": "Elegir un archivo PDF",
+        "process_contract": "Procesar Contrato",
+        "processing_contract": "Procesando contrato...",
+        "file_uploaded_to": "Archivo subido a",
+        "extracting_data": "Extrayendo datos del contrato...",
+        "saving_data_to_bigquery": "Guardando datos en BigQuery...",
+        "contract_processed_successfully": "Contrato procesado y guardado exitosamente!",
+        "failed_to_process_contract": "Fallo al procesar el contrato:",
+        "an_error_occurred": "Ocurrió un error:",
+        "agent_interaction_header": "Interacción del Agente - Hablar con Contratos",
+        "agent_interaction_description": "Esta sección le permite interactuar con el agente Gemini para hacer preguntas sobre contratos.",
+        "ask_question_about_contracts": "Haga una pregunta sobre contratos:",
+        "ask_agent": "Preguntar al Agente",
+        "you_asked": "Usted preguntó:",
+        "agent_error": "Error del Agente:",
+        "unknown_error": "Error desconocido",
+        "unexpected_error_occurred": "Ocurrió un error inesperado:",
+        "please_enter_question": "Por favor, ingrese una pregunta.",
+        "view_pdf": "Ver PDF",
+        "database_schema": "Esquema de la Base de Datos",
+    }
+}
+
+# Session state for language
+if 'language' not in st.session_state:
+    st.session_state.language = 'en'
+
+def _(key):
+    return translations[st.session_state.language].get(key, key)
 
 # Custom CSS for styling
 st.markdown("""
@@ -55,7 +154,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Header
-st.markdown('<p class="main-header">LegalMind</p><p class="sub-header">Contract Analyzer</p>', unsafe_allow_html=True)
+st.markdown(f'<p class="main-header">{_("main_header")}</p><p class="sub-header">{_("sub_header")}</p>', unsafe_allow_html=True)
 
 
 # Initialize the ContractAgent and BigQueryClient
@@ -74,8 +173,32 @@ agent = ContractAgent(
 )
 
 # Sidebar for navigation
-st.sidebar.image("https://storage.googleapis.com/cloud-native-news/2022/03/cymbals-logo-1-1024x576.png", width=150)
-page = st.sidebar.radio("Go to", ["Contracts", "Analyze new Contract", "Agent Interaction"])
+# Load the image from package resources and convert SVG to PNG if necessary
+try:
+    with pkg_resources.open_binary('contract_ai_agent_modules.static.images', 'Walmart_Chile_Logo.svg') as f:
+        svg_data = f.read()
+    
+    # Convert SVG to PNG
+    png_data = svg2png(bytestring=svg_data, output_width=150, output_height=150) # Adjust dimensions as needed
+    image_bytes = io.BytesIO(png_data)
+    
+    st.sidebar.image(image_bytes, width=150)
+except FileNotFoundError:
+    st.sidebar.warning(_("sidebar_image_not_found"))
+except Exception as e:
+    st.sidebar.error(f"{_('error_loading_sidebar_image')} {e}")
+
+page = st.sidebar.radio(_("go_to"), [_("contracts"), _("analyze_new_contract"), _("agent_interaction")])
+
+# Language selection at the bottom of the sidebar
+st.sidebar.markdown("---") # Add a separator
+st.sidebar.selectbox(
+    _("language"),
+    options=["English", "Español"],
+    index=0 if st.session_state.language == 'en' else 1,
+    on_change=lambda: st.session_state.update(language='en' if st.session_state.language == 'es' else 'es'),
+    key="language_selector" # Add a key to prevent duplicate widget error if "Go to" is also a selectbox
+)
 
 def format_agent_response(result):
     """Formats the agent's response for display in the Streamlit UI."""
@@ -89,7 +212,7 @@ def format_agent_response(result):
                 # Check if the response is a JSON string for schema explanation
                 data = json.loads(result['response'])
                 if 'schema_explanation' in data and isinstance(data['schema_explanation'], list):
-                    markdown_output = "### Database Schema\n"
+                    markdown_output = f"### {_('database_schema')}\n"
                     for field in data['schema_explanation']:
                         markdown_output += f"- **`{field.get('name', 'N/A')}`** (`{field.get('type', 'N/A')}`): {field.get('description', 'N/A')}\n"
                     return markdown_output
@@ -105,7 +228,7 @@ def format_agent_response(result):
     return str(result)
 
 def display_contract_details(contract_id):
-    st.subheader(f"Contract Details: {contract_id}")
+    st.subheader(f"{_('contract_details')} {contract_id}")
     contract_details_df = bigquery_client.query_to_dataframe(queries.get_contract_details_query(contract_id))
     if not contract_details_df.empty:
         details = contract_details_df.to_dict(orient='records')[0]
@@ -118,7 +241,7 @@ def display_contract_details(contract_id):
                     url = f"https://storage.googleapis.com/{bucket_name}/{file_path}"
                     st.markdown(f"**{key.replace('_', ' ').title()}:** [View PDF]({url})")
                 else:
-                    st.markdown(f"**{key.replace('_', ' ').title()}:** Not available")
+                    st.markdown(f"**{key.replace('_', ' ').title()}:** {_('not_available')}")
             elif key == "financials":
                 st.markdown(f"**{key.replace('_', ' ').title()}:**")
                 try:
@@ -130,10 +253,10 @@ def display_contract_details(contract_id):
             else:
                 st.markdown(f"**{key.replace('_', ' ').title()}:** {value}")
     else:
-        st.info(f"No detailed information found for Contract ID: {contract_id}")
+        st.info(f"{_('no_detailed_info')} {contract_id}")
 
 def display_extracted_data(data):
-    st.subheader("Extracted Contract Data")
+    st.subheader(_("extracted_contract_data"))
     with st.container(border=True):
         for key, value in data.items():
             if key == "financials" and isinstance(value, str):
@@ -160,25 +283,25 @@ def upload_to_gcs(uploaded_file):
 
     return f"gs://{bucket_name}/{uploaded_file.name}"
 
-if page == "Contracts":
-    st.header("Contracts")
-    st.write("This section lists all contracts. Use the filters to narrow down the results and click on a contract to view its details.")
+if page == _("contracts"):
+    st.header(_("contracts"))
+    st.write(_("this_section_lists_contracts"))
     
     contracts_df = bigquery_client.query_to_dataframe(queries.CONTRACTS_QUERY)
     
     if contracts_df.empty:
-        st.info("No contract data available or failed to fetch data.")
+        st.info(_("no_contract_data_available"))
     else:
         # --- Search and Filter ---
         col1, col2, col3 = st.columns(3)
         with col1:
-            search_term = st.text_input("Search by any attribute")
+            search_term = st.text_input(_("search_by_attribute"))
         with col2:
             company_options = sorted([c for c in pd.Series(contracts_df["company"]).unique() if c is not None])
-            company_filter = st.selectbox("Filter by Company", ["All"] + company_options)
+            company_filter = st.selectbox(_("filter_by_company"), [_("all")] + company_options)
         with col3:
             bu_options = sorted([bu for bu in pd.Series(contracts_df["business_unit"]).unique() if bu is not None])
-            bu_filter = st.selectbox("Filter by Business Unit", ["All"] + bu_options)
+            bu_filter = st.selectbox(_("filter_by_business_unit"), [_("all")] + bu_options)
 
         # --- Apply Filters ---
         filtered_df = contracts_df.copy()
@@ -193,7 +316,7 @@ if page == "Contracts":
             filtered_df = filtered_df[filtered_df["business_unit"] == bu_filter]
 
         # --- Display Table and Handle Selection ---
-        st.write("Select a row to view contract details.")
+        st.write(_("select_row_to_view_details"))
         
         # Reset index to ensure selection works correctly after filtering
         filtered_df_display = filtered_df.reset_index(drop=True)
@@ -213,18 +336,18 @@ if page == "Contracts":
             with st.container(border=True):
                 display_contract_details(selected_contract_id)
 
-elif page == "Analyze new Contract":
-    st.header("Analyze new Contract")
+elif page == _("analyze_new_contract"):
+    st.header(_("analyze_new_contract"))
     
-    uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
+    uploaded_file = st.file_uploader(_("choose_pdf_file"), type="pdf")
     
     if uploaded_file is not None:
-        if st.button("Process Contract"):
-            with st.spinner("Processing contract..."):
+        if st.button(_("process_contract")):
+            with st.spinner(_("processing_contract")):
                 try:
                     # 1. Upload to GCS
                     gcs_uri = upload_to_gcs(uploaded_file)
-                    st.success(f"File uploaded to {gcs_uri}")
+                    st.success(f"{_('file_uploaded_to')} {gcs_uri}")
 
                     # 2. Save to a temporary local file
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
@@ -232,7 +355,7 @@ elif page == "Analyze new Contract":
                         temp_file_path = temp_file.name
 
                     # 3. Process with MCP
-                    st.info("Extracting data from the contract...")
+                    st.info(_("extracting_data"))
                     result = asyncio.run(agent.add_new_contract(temp_file_path))
                     if result.is_successful:
                         extracted_data = result.result
@@ -244,29 +367,29 @@ elif page == "Analyze new Contract":
                             extracted_data['financials'] = json.dumps(extracted_data['financials'])
                         
                         # Insert into BigQuery
-                        st.info("Saving data to BigQuery...")
+                        st.info(_("saving_data_to_bigquery"))
                         bigquery_client.insert_row("contracts", extracted_data)
-                        st.success("Contract processed and saved successfully!")
+                        st.success(_("contract_processed_successfully"))
                         display_extracted_data(extracted_data)
                     else:
-                        st.error(f"Failed to process contract: {result.error}")
+                        st.error(f"{_('failed_to_process_contract')} {result.error}")
 
                 except Exception as e:
-                    st.error(f"An error occurred: {e}")
+                    st.error(f"{_('an_error_occurred')} {e}")
                 finally:
                     # Clean up the temporary file
                     if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
                         os.remove(temp_file_path)
 
 
-elif page == "Agent Interaction":
-    st.header("Agent Interaction - Talk with Contracts")
-    st.write("This section allows you to interact with the Gemini agent to ask questions about contracts.")
+elif page == _("agent_interaction"):
+    st.header(_("agent_interaction_header"))
+    st.write(_("agent_interaction_description"))
 
-    user_query = st.text_area("Ask a question about contracts:")
-    if st.button("Ask Agent"):
+    user_query = st.text_area(_("ask_question_about_contracts"))
+    if st.button(_("ask_agent")):
         if user_query:
-            st.info(f"You asked: {user_query}")
+            st.info(f"{_('you_asked')} {user_query}")
             try:
                 # Run the async process_query in a synchronous Streamlit context
                 response = asyncio.run(agent.process_query(user_query))
@@ -275,12 +398,12 @@ elif page == "Agent Interaction":
                         formatted_response = format_agent_response(response.result)
                         st.markdown(formatted_response, unsafe_allow_html=True)
                     else:
-                        st.error(f"Agent Error: {response.error if isinstance(response.error, str) else 'Unknown error'}")
+                        st.error(f"{_('agent_error')} {response.error if isinstance(response.error, str) else _('unknown_error')}")
                 else:
                     # Handle direct string responses
                     formatted_response = format_agent_response(response)
                     st.markdown(formatted_response, unsafe_allow_html=True)
             except Exception as e:
-                st.error(f"An unexpected error occurred: {e}")
+                st.error(f"{_('unexpected_error_occurred')} {e}")
         else:
-            st.warning("Please enter a question.")
+            st.warning(_("please_enter_question"))
