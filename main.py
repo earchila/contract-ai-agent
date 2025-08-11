@@ -59,7 +59,7 @@ st.markdown('<p class="main-header">LegalMind</p><p class="sub-header">Contract 
 
 
 # Initialize the ContractAgent and BigQueryClient
-bigquery_project_id = os.environ.get("BIGQUERY_PROJECT_ID", "walmart-chile-458918")
+bigquery_project_id = os.environ.get("BIGQUERY_PROJECT_ID", "XXXXXXXX")
 bigquery_location = os.environ.get("BIGQUERY_LOCATION", "us-central1")
 bigquery_dataset_id = "contract_data"
 bigquery_max_rows = int(os.environ.get("BIGQUERY_MAX_ROWS", 100))
