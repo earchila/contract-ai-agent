@@ -65,10 +65,10 @@ This guide provides instructions on how to set up and run the Contract AI Agent 
 
 ## Running the Application
 
-Once all prerequisites and setup steps are completed, you can run the Streamlit application:
+To run the Streamlit application, use the provided wrapper script. This script ensures that the necessary `cairo` library is correctly found at runtime, addressing potential `OSError` issues on macOS.
 
 ```bash
-streamlit run main.py
+./run_app.sh
 ```
 
 This will open the application in your web browser.
