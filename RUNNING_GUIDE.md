@@ -19,7 +19,7 @@ This guide provides instructions on how to set up and run the Contract AI Agent 
 
 2.  **Create a Python Virtual Environment (Recommended):**
     ```bash
-    python -m venv venv
+    python3 -m venv venv
     source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
     ```
 
@@ -45,14 +45,15 @@ This guide provides instructions on how to set up and run the Contract AI Agent 
         (On Windows, use `set GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\service-account-key.json"`)
 
 5.  **Set Environment Variables:**
-    The application requires certain environment variables for BigQuery configuration. Replace `YOUR_PROJECT_ID` and `YOUR_LOCATION` with your actual GCP project ID and desired BigQuery location (e.g., `us-central1`).
+    The application requires certain environment variables for BigQuery and Vertex AI configuration. Create a `.env` file in the root directory of the project and add the following variables:
 
-    ```bash
-    export BIGQUERY_PROJECT_ID="YOUR_PROJECT_ID"
-    export BIGQUERY_LOCATION="YOUR_LOCATION"
-    export BIGQUERY_MAX_ROWS="100" # Optional: Adjust as needed
     ```
-    (On Windows, use `set BIGQUERY_PROJECT_ID="YOUR_PROJECT_ID"` etc.)
+    PROJECT_ID="YOUR_GCP_PROJECT_ID"
+    VERTEX_AI_LOCATION="YOUR_VERTEX_AI_REGION" # e.g., us-central1
+    BIGQUERY_MAX_ROWS="100" # Optional: Adjust as needed
+    ```
+
+    Replace `YOUR_GCP_PROJECT_ID` with your Google Cloud Project ID and `YOUR_VERTEX_AI_REGION` with the region where your Gemini model is deployed (e.g., `us-central1`). The default Gemini model used is `gemini-2.5-flash`.
 
     Ensure that the `contract_data` dataset exists in your BigQuery project, and a `contracts` table within it, or modify the `bigquery_dataset_id` and `default_table_id` variables in `main.py` and `contract_ai_agent_modules/adk/agents/toolsets/bigquery/config.py` accordingly.
 

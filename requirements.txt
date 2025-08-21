@@ -8,3 +8,6 @@ google-cloud-storage
 pandas
 tabulate
 python-dotenv
+google-cloud-aiplatform
+google-generativeai
+vertexai

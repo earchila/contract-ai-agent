@@ -43,10 +43,10 @@ class BaseTool(abc.ABC):
   def parameters(self) -> Dict[str, inspect.Parameter]:
     return self._parameters
 
-  def to_function_declaration(self) -> "FunctionDeclaration":
-    """Converts the tool to a Vertex AI FunctionDeclaration."""
-    from vertexai.generative_models import FunctionDeclaration
-    
+  def to_function_declaration(self) -> "Tool":
+    """Converts the tool to a Vertex AI Tool."""
+    from vertexai.generative_models import FunctionDeclaration, Tool
+
     parameters = {
         name: {
             "type": self._get_schema_type(param.annotation),
@@ -67,7 +67,7 @@ class BaseTool(abc.ABC):
         not in ["client", "readonly_context", "bigquery_tool_config"]
     ]
 
-    return FunctionDeclaration(
+    function_declaration = FunctionDeclaration(
         name=self.name,
         description=self.description,
         parameters={
@@ -76,6 +76,7 @@ class BaseTool(abc.ABC):
             "required": required,
         },
     )
+    return Tool(function_declarations=[function_declaration])
 
   def _get_schema_type(self, annotation: Any) -> str:
     """Converts a Python type annotation to a JSON Schema type."""

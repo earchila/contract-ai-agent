@@ -46,3 +46,15 @@ streamlit run main.py
 ```
 
 The application will open in your browser.
+
+### 5. Configure Vertex AI (for Gemini Model)
+
+The application uses Google Gemini models via Vertex AI. Create a `.env` file in the root directory of the project and add the following variables:
+
+```
+PROJECT_ID="YOUR_GCP_PROJECT_ID"
+VERTEX_AI_LOCATION="YOUR_VERTEX_AI_REGION" # e.g., us-central1
+```
+
+Replace `YOUR_GCP_PROJECT_ID` with your Google Cloud Project ID and `YOUR_VERTEX_AI_REGION` with the region where your Gemini model is deployed (e.g., `us-central1`). The default model used is `gemini-2.5-flash`.
+```

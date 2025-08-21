@@ -16,11 +16,12 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-import vertexai
-from vertexai.generative_models import GenerativeModel, Tool
 import os # Import os for environment variables
 import subprocess
 from dotenv import load_dotenv # Import load_dotenv
+import vertexai
+from google.api_core.client_options import ClientOptions
+from vertexai.generative_models import GenerativeModel, Tool # Import GenerativeModel and Tool from vertexai
 
 load_dotenv() # Load environment variables from .env file
 
@@ -56,7 +57,10 @@ class ContractAgent:
     self._document_processing_toolset = DocumentProcessingToolset()
 
     # Initialize Vertex AI
-    vertexai.init(project=os.environ.get("GOOGLE_CLOUD_PROJECT"), location=os.environ.get("GOOGLE_CLOUD_LOCATION"))
+    project_id = os.environ.get("PROJECT_ID")
+    location = os.environ.get("VERTEX_AI_LOCATION")
+    vertexai.init(project=project_id, location=location)
+
     # Get the model
     self._model = GenerativeModel(model_name)
 
@@ -87,7 +91,11 @@ class ContractAgent:
     all_tools = await self._bigquery_toolset.get_tools(readonly_context)
     
     # Convert BaseTool objects to vertexai.generative_models.Tool objects
-    vertexai_tools = [Tool(function_declarations=[tool.to_function_declaration()]) for tool in all_tools]
+    # Convert BaseTool objects to google.generativeai.types.Tool objects
+    # The google.generativeai library expects a list of FunctionDeclaration objects directly
+    # within the tools parameter, not wrapped in a Tool object.
+    # So, we extract the function_declarations from our BaseTool objects.
+    genai_tools = [tool.to_function_declaration() for tool in all_tools]
 
     # Send the query to the model
     chat_session = self._model.start_chat()
@@ -130,17 +138,23 @@ class ContractAgent:
 **User Request:**
 {query}
 """
-    response = chat_session.send_message(prompt, tools=vertexai_tools)
+    response = chat_session.send_message(prompt, tools=genai_tools)
 
     # Process the model's response
     if response.candidates:
         candidate = response.candidates[0]
+        # The google-generativeai library's Part object might have different attributes
+        # for function calls and text. We need to adapt to its structure.
+        # The error indicates a problem with 'data' oneof fields, suggesting
+        # a single Part might be trying to hold multiple types of content.
+        # We'll iterate through parts and check for function_call or text.
         if candidate.content and candidate.content.parts:
             for part in candidate.content.parts:
-                if part.function_call:
+                if hasattr(part, 'function_call') and part.function_call:
                     # Execute the tool call
                     tool_call = part.function_call
                     tool_name = tool_call.name
+                    # Convert tool_call.args to a dictionary if it's not already
                     tool_args = {k: v for k, v in tool_call.args.items()}
 
                     # Find the tool and execute it
@@ -155,7 +169,7 @@ class ContractAgent:
                             except Exception as e:
                                 return ToolResult.from_error(f"Error executing tool '{tool_name}': {e}")
                     return ToolResult.from_error(f"Tool '{tool_name}' not found.")
-                elif part.text:
+                elif hasattr(part, 'text') and part.text:
                     # If the model returns text, check if it's a valid SQL query
                     sql_query = part.text.strip()
                     # A simple check to see if the response is likely a SQL query
