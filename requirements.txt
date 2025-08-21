@@ -1,0 +1,7 @@
+google-cloud-bigquery
+typing_extensions
+streamlit
+db-dtypes
+google-cloud-storage
+pandas
+tabulate

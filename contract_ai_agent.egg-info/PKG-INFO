@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: contract-ai-agent
+Version: 0.1.0
+Requires-Python: >=3.9
+Requires-Dist: google-cloud-bigquery
+Requires-Dist: typing_extensions
+Requires-Dist: streamlit
