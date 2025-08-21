@@ -436,24 +436,25 @@ elif page == _("agent_interaction"):
 
         # Get agent response
         with st.chat_message("assistant"):
-            message_placeholder = st.empty()
-            full_response = ""
-            try:
-                # Run the async process_query in a synchronous Streamlit context
-                response = asyncio.run(agent.process_query(prompt))
-                if hasattr(response, 'is_successful'):
-                    if response.is_successful:
-                        formatted_response = format_agent_response(response.result)
-                        full_response = formatted_response
+            with st.spinner("Thinking..."): # Add spinner here
+                message_placeholder = st.empty()
+                full_response = ""
+                try:
+                    # Run the async process_query in a synchronous Streamlit context
+                    response = asyncio.run(agent.process_query(prompt))
+                    if hasattr(response, 'is_successful'):
+                        if response.is_successful:
+                            formatted_response = format_agent_response(response.result)
+                            full_response = formatted_response
+                        else:
+                            full_response = f"{_('agent_error')} {response.error if isinstance(response.error, str) else _('unknown_error')}"
                     else:
-                        full_response = f"{_('agent_error')} {response.error if isinstance(response.error, str) else _('unknown_error')}"
-                else:
-                    # Handle direct string responses
-                    formatted_response = format_agent_response(response)
-                    full_response = formatted_response
-            except Exception as e:
-                full_response = f"{_('unexpected_error_occurred')} {e}"
-            
-            message_placeholder.markdown(full_response, unsafe_allow_html=True)
-        # Add assistant response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
+                        # Handle direct string responses
+                        formatted_response = format_agent_response(response)
+                        full_response = formatted_response
+                except Exception as e:
+                    full_response = f"{_('unexpected_error_occurred')} {e}"
+                
+                message_placeholder.markdown(full_response, unsafe_allow_html=True)
+            # Add assistant response to chat history
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
