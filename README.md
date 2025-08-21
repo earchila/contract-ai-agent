@@ -25,7 +25,7 @@ gcloud auth application-default login
 The contract analyzer is a Node.js server. To run it, first install its dependencies:
 
 ```bash
-cd contract-analyzer-server
+cd contract-ai-agent
 npm install
 ```
 

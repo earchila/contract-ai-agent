@@ -1,7 +1,10 @@
 google-cloud-bigquery
 typing_extensions
 streamlit
+cairosvg
+Pillow
 db-dtypes
 google-cloud-storage
 pandas
 tabulate
+python-dotenv

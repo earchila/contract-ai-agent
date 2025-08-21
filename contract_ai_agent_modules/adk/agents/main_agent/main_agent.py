@@ -20,6 +20,9 @@ import vertexai
 from vertexai.generative_models import GenerativeModel, Tool
 import os # Import os for environment variables
 import subprocess
+from dotenv import load_dotenv # Import load_dotenv
+
+load_dotenv() # Load environment variables from .env file
 
 from contract_ai_agent_modules.adk.agents.readonly_context import ReadonlyContext
 from contract_ai_agent_modules.adk.tools.base_tool import BaseTool
