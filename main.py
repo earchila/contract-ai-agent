@@ -287,21 +287,52 @@ if page == _("contracts"):
     st.header(_("contracts"))
     st.write(_("this_section_lists_contracts"))
     
-    contracts_df = bigquery_client.query_to_dataframe(queries.CONTRACTS_QUERY)
+    @st.cache_data(ttl=3600) # Cache data for 1 hour
+    def get_contracts_data():
+        return bigquery_client.query_to_dataframe(queries.CONTRACTS_QUERY)
+
+    contracts_df = get_contracts_data()
     
     if contracts_df.empty:
         st.info(_("no_contract_data_available"))
     else:
         # --- Search and Filter ---
+        # Initialize filter states in session_state if not present
+        if 'search_term' not in st.session_state:
+            st.session_state.search_term = ""
+        if 'company_filter' not in st.session_state:
+            st.session_state.company_filter = _("all")
+        if 'bu_filter' not in st.session_state:
+            st.session_state.bu_filter = _("all")
+
         col1, col2, col3 = st.columns(3)
         with col1:
-            search_term = st.text_input(_("search_by_attribute"))
+            search_term = st.text_input(_("search_by_attribute"), value=st.session_state.search_term, key="search_input")
+            st.session_state.search_term = search_term # Update session state on change
         with col2:
             company_options = sorted([c for c in pd.Series(contracts_df["company"]).unique() if c is not None])
-            company_filter = st.selectbox(_("filter_by_company"), [_("all")] + company_options)
+            # Ensure 'All' is always the first option and translated
+            company_options_display = [_("all")] + company_options
+            # Find the current index of the selected company filter
+            try:
+                default_company_index = company_options_display.index(st.session_state.company_filter)
+            except ValueError:
+                default_company_index = 0 # Default to 'All' if not found
+            
+            company_filter = st.selectbox(_("filter_by_company"), company_options_display, index=default_company_index, key="company_filter_select")
+            st.session_state.company_filter = company_filter # Update session state on change
         with col3:
             bu_options = sorted([bu for bu in pd.Series(contracts_df["business_unit"]).unique() if bu is not None])
-            bu_filter = st.selectbox(_("filter_by_business_unit"), [_("all")] + bu_options)
+            # Ensure 'All' is always the first option and translated
+            bu_options_display = [_("all")] + bu_options
+            # Find the current index of the selected business unit filter
+            try:
+                default_bu_index = bu_options_display.index(st.session_state.bu_filter)
+            except ValueError:
+                default_bu_index = 0 # Default to 'All' if not found
+
+            bu_filter = st.selectbox(_("filter_by_business_unit"), bu_options_display, index=default_bu_index, key="bu_filter_select")
+            st.session_state.bu_filter = bu_filter # Update session state on change
 
         # --- Apply Filters ---
         filtered_df = contracts_df.copy()
@@ -310,9 +341,9 @@ if page == _("contracts"):
             filtered_df = filtered_df[
                 filtered_df[search_cols].apply(lambda row: row.astype(str).str.contains(search_term, case=False, na=False).any(), axis=1)
             ]
-        if company_filter != "All":
+        if company_filter != _("all"): # Use translated 'all'
             filtered_df = filtered_df[filtered_df["company"] == company_filter]
-        if bu_filter != "All":
+        if bu_filter != _("all"): # Use translated 'all'
             filtered_df = filtered_df[filtered_df["business_unit"] == bu_filter]
 
         # --- Display Table and Handle Selection ---
@@ -386,24 +417,43 @@ elif page == _("agent_interaction"):
     st.header(_("agent_interaction_header"))
     st.write(_("agent_interaction_description"))
 
-    user_query = st.text_area(_("ask_question_about_contracts"))
-    if st.button(_("ask_agent")):
-        if user_query:
-            st.info(f"{_('you_asked')} {user_query}")
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Display chat messages from history on app rerun
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"], unsafe_allow_html=True)
+
+    # Accept user input
+    if prompt := st.chat_input(_("ask_question_about_contracts")):
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        # Display user message in chat message container
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Get agent response
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            full_response = ""
             try:
                 # Run the async process_query in a synchronous Streamlit context
-                response = asyncio.run(agent.process_query(user_query))
+                response = asyncio.run(agent.process_query(prompt))
                 if hasattr(response, 'is_successful'):
                     if response.is_successful:
                         formatted_response = format_agent_response(response.result)
-                        st.markdown(formatted_response, unsafe_allow_html=True)
+                        full_response = formatted_response
                     else:
-                        st.error(f"{_('agent_error')} {response.error if isinstance(response.error, str) else _('unknown_error')}")
+                        full_response = f"{_('agent_error')} {response.error if isinstance(response.error, str) else _('unknown_error')}"
                 else:
                     # Handle direct string responses
                     formatted_response = format_agent_response(response)
-                    st.markdown(formatted_response, unsafe_allow_html=True)
+                    full_response = formatted_response
             except Exception as e:
-                st.error(f"{_('unexpected_error_occurred')} {e}")
-        else:
-            st.warning(_("please_enter_question"))
+                full_response = f"{_('unexpected_error_occurred')} {e}"
+            
+            message_placeholder.markdown(full_response, unsafe_allow_html=True)
+        # Add assistant response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
